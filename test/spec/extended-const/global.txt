@@ -1,0 +1,3 @@
+;;; TOOL: run-interp-spec
+;;; STDIN_FILE: third_party/testsuite/proposals/extended-const/global.wast
+;;; ARGS*: --enable-extended-const
