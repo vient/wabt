@@ -341,7 +341,7 @@ struct FuncDesc {
 
   FuncType type;
   std::vector<LocalDesc> locals;
-  u32 code_offset;
+  u32 code_offset;  // Istream offset.
   std::vector<HandlerDesc> handlers;
 };
 
