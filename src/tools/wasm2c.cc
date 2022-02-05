@@ -63,13 +63,6 @@ static void ParseOptions(int argc, char** argv) {
     s_verbose++;
     s_log_stream = FileStream::CreateStderr();
   });
-  parser.AddOption(
-      'o', "output", "FILENAME",
-      "Output file for the generated C source file, by default use stdout",
-      [](const char* argument) {
-        s_outfile = argument;
-        ConvertBackslashToSlash(&s_outfile);
-      });
   s_features.AddOptions(&parser);
   parser.AddOption("no-debug-names", "Ignore debug names in the binary file",
                    []() { s_read_debug_names = false; });
@@ -78,6 +71,12 @@ static void ParseOptions(int argc, char** argv) {
                        s_infile = argument;
                        ConvertBackslashToSlash(&s_infile);
                      });
+  parser.AddArgument(
+      "output", OptionParser::ArgumentCount::One,
+      [](const char* argument) {
+        s_outfile = argument;
+        ConvertBackslashToSlash(&s_outfile);
+      });
   parser.Parse(argc, argv);
 
   // TODO(binji): currently wasm2c doesn't support any non-default feature
