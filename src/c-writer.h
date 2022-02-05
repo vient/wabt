@@ -28,6 +28,7 @@ struct WriteCOptions {};
 
 Result WriteC(Stream* c_stream,
               Stream* h_stream,
+              Stream* imports_stream,
               const char* header_name,
               const Module*,
               const WriteCOptions&);

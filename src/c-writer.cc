@@ -121,11 +121,13 @@ class CWriter {
  public:
   CWriter(Stream* c_stream,
           Stream* h_stream,
+          Stream* imports_stream,
           const char* header_name,
           const WriteCOptions& options)
       : options_(options),
         c_stream_(c_stream),
         h_stream_(h_stream),
+        imports_stream_(imports_stream),
         header_name_(header_name) {}
 
   Result WriteModule(const Module&);
@@ -140,6 +142,7 @@ class CWriter {
 
   void WriteCHeader();
   void WriteCSource();
+  void WriteImportsSource();
 
   size_t MarkTypeStack() const;
   void ResetTypeStack(size_t mark);
@@ -224,6 +227,7 @@ class CWriter {
   void WriteMultivalueTypes();
   void WriteFuncTypes();
   void WriteImports();
+  void WriteImportsStubs();
   void WriteFuncDeclarations();
   void WriteFuncDeclaration(const FuncDeclaration&, const std::string&);
   void WriteGlobals();
@@ -277,6 +281,7 @@ class CWriter {
   MemoryStream func_stream_;
   Stream* c_stream_ = nullptr;
   Stream* h_stream_ = nullptr;
+  Stream* imports_stream_ = nullptr;
   std::string header_name_;
   Result result_ = Result::Ok;
   int indent_ = 0;
@@ -914,6 +919,58 @@ void CWriter::WriteImports() {
         const Table& table = cast<TableImport>(import)->table;
         WriteTable(DefineImportName(table.name, import->module_name,
                                     MangleName(import->field_name)));
+        break;
+      }
+
+      default:
+        WABT_UNREACHABLE;
+    }
+
+    Write(Newline());
+  }
+}
+
+void CWriter::WriteImportsStubs() {
+  if (module_->imports.empty())
+    return;
+
+  Write(Newline());
+
+  for (const Import* import : module_->imports) {
+    Write("/* import: '", import->module_name, "' '", import->field_name,
+          "' */", Newline());
+    Write("__attribute__((visibility(\"default\"))) ");
+    switch (import->kind()) {
+      case ExternalKind::Func: {
+        const Func& func = cast<FuncImport>(import)->func;
+        Write("void ");
+        Write(MangleFuncName(import->field_name, func.decl.sig.param_types,
+                               func.decl.sig.result_types));
+        Write("() {}");
+        break;
+      }
+
+      case ExternalKind::Global: {
+        const Global& global = cast<GlobalImport>(import)->global;
+        Write("int ");
+        Write(MangleGlobalName(import->field_name, global.type));
+        Write(";  /* global */");
+        break;
+      }
+
+      case ExternalKind::Memory: {
+        // const Memory& memory = cast<MemoryImport>(import)->memory;
+        Write("int ");
+        Write(MangleName(import->field_name));
+        Write(";  /* memory */");
+        break;
+      }
+
+      case ExternalKind::Table: {
+        // const Table& table = cast<TableImport>(import)->table;
+        Write("int ");
+        Write(MangleName(import->field_name));
+        Write(";  /* table */");
         break;
       }
 
@@ -2378,11 +2435,17 @@ void CWriter::WriteCSource() {
   WriteInit();
 }
 
+void CWriter::WriteImportsSource() {
+  stream_ = imports_stream_;
+  WriteImportsStubs();
+}
+
 Result CWriter::WriteModule(const Module& module) {
   WABT_USE(options_);
   module_ = &module;
   WriteCHeader();
   WriteCSource();
+  WriteImportsSource();
   return result_;
 }
 
@@ -2390,10 +2453,11 @@ Result CWriter::WriteModule(const Module& module) {
 
 Result WriteC(Stream* c_stream,
               Stream* h_stream,
+              Stream* imports_stream,
               const char* header_name,
               const Module* module,
               const WriteCOptions& options) {
-  CWriter c_writer(c_stream, h_stream, header_name, options);
+  CWriter c_writer(c_stream, h_stream, imports_stream, header_name, options);
   return c_writer.WriteModule(*module);
 }
 
