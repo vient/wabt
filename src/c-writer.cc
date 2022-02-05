@@ -935,7 +935,7 @@ void CWriter::WriteFuncDeclarations() {
   for (const Func* func : module_->funcs) {
     bool is_import = func_index < module_->num_func_imports;
     if (!is_import) {
-      Write("static ");
+      Write("__attribute__((noinline, __cdecl__)) static ");
       WriteFuncDeclaration(func->decl, DefineGlobalScopeName(func->name));
       Write(";", Newline());
     }
