@@ -128,7 +128,7 @@ typedef struct {
  *  The result of `wasm_rt_try` will be the provided trap reason.
  *
  *  This is typically called by the generated code, and not the embedder. */
-extern void wasm_rt_trap(wasm_rt_trap_t) __attribute__((noreturn));
+extern void wasm_rt_trap(wasm_rt_trap_t);
 
 /** Register a function type with the given signature. The returned function
  * index is guaranteed to be the same for all calls with the same signature.

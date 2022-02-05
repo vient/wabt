@@ -6,7 +6,7 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 
-#define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), 0)
+#define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), __builtin_trap(), 0)
 
 #ifdef WASM2IDA_KEEP_CHECKS
 #define FUNC_PROLOGUE                                            \

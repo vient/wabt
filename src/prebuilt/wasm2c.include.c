@@ -9,7 +9,7 @@ const char SECTION_NAME(declarations)[] =
 "#define UNLIKELY(x) __builtin_expect(!!(x), 0)\n"
 "#define LIKELY(x) __builtin_expect(!!(x), 1)\n"
 "\n"
-"#define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), 0)\n"
+"#define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), __builtin_trap(), 0)\n"
 "\n"
 "#ifdef WASM2IDA_KEEP_CHECKS\n"
 "#define FUNC_PROLOGUE                                            \\\n"
