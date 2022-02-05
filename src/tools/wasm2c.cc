@@ -50,10 +50,10 @@ static const char s_description[] =
 
 examples:
   # parse binary file test.wasm and write test.c and test.h
-  $ wasm2c test.wasm -o test.c
+  $ wasm2c test.wasm test.c
 
   # parse test.wasm, write test.c and test.h, but ignore the debug names, if any
-  $ wasm2c test.wasm --no-debug-names -o test.c
+  $ wasm2c test.wasm --no-debug-names test.c
 )";
 
 static void ParseOptions(int argc, char** argv) {
@@ -138,19 +138,13 @@ int ProgramMain(int argc, char** argv) {
       }
 
       if (Succeeded(result)) {
-        if (!s_outfile.empty()) {
-          std::string header_name_full =
-              strip_extension(s_outfile).to_string() + ".h";
-          FileStream c_stream(s_outfile.c_str());
-          FileStream h_stream(header_name_full);
-          string_view header_name = GetBasename(header_name_full);
-          result = WriteC(&c_stream, &h_stream, header_name.to_string().c_str(),
-                          &module, s_write_c_options);
-        } else {
-          FileStream stream(stdout);
-          result =
-              WriteC(&stream, &stream, "wasm.h", &module, s_write_c_options);
-        }
+        std::string header_name_full =
+            strip_extension(s_outfile).to_string() + ".h";
+        FileStream c_stream(s_outfile.c_str());
+        FileStream h_stream(header_name_full);
+        string_view header_name = GetBasename(header_name_full);
+        result = WriteC(&c_stream, &h_stream, header_name.to_string().c_str(),
+                        &module, s_write_c_options);
       }
     }
     FormatErrorsToFile(errors, Location::Type::Binary);
