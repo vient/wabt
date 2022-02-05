@@ -934,8 +934,6 @@ void CWriter::WriteImportsStubs() {
   if (module_->imports.empty())
     return;
 
-  Write(Newline());
-
   for (const Import* import : module_->imports) {
     Write("/* import: '", import->module_name, "' '", import->field_name,
           "' */", Newline());
@@ -944,7 +942,7 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Func: {
         const Func& func = cast<FuncImport>(import)->func;
         Write("void ");
-        Write(MangleFuncName(import->field_name, func.decl.sig.param_types,
+        Write(MangleName(import->module_name) + MangleFuncName(import->field_name, func.decl.sig.param_types,
                                func.decl.sig.result_types));
         Write("() {}");
         break;
@@ -953,7 +951,7 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Global: {
         const Global& global = cast<GlobalImport>(import)->global;
         Write("int ");
-        Write(MangleGlobalName(import->field_name, global.type));
+        Write(MangleName(import->module_name) + MangleGlobalName(import->field_name, global.type));
         Write(";  /* global */");
         break;
       }
@@ -961,7 +959,7 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Memory: {
         // const Memory& memory = cast<MemoryImport>(import)->memory;
         Write("int ");
-        Write(MangleName(import->field_name));
+        Write(MangleName(import->module_name) + MangleName(import->field_name));
         Write(";  /* memory */");
         break;
       }
@@ -969,7 +967,7 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Table: {
         // const Table& table = cast<TableImport>(import)->table;
         Write("int ");
-        Write(MangleName(import->field_name));
+        Write(MangleName(import->module_name) + MangleName(import->field_name));
         Write(";  /* table */");
         break;
       }
