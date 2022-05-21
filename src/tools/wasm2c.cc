@@ -56,6 +56,14 @@ examples:
   $ wasm2c test.wasm --no-debug-names test.c
 )";
 
+static const std::string supported_features[] = {
+    "multi-memory", "multi-value", "sign-extend", "saturating-float-to-int"};
+
+static bool IsFeatureSupported(const std::string& feature) {
+  return std::find(std::begin(supported_features), std::end(supported_features),
+                   feature) != std::end(supported_features);
+};
+
 static void ParseOptions(int argc, char** argv) {
   OptionParser parser("wasm2c", s_description);
 
@@ -63,6 +71,20 @@ static void ParseOptions(int argc, char** argv) {
     s_verbose++;
     s_log_stream = FileStream::CreateStderr();
   });
+  parser.AddOption(
+      'o', "output", "FILENAME",
+      "Output file for the generated C source file, by default use stdout",
+      [](const char* argument) {
+        s_outfile = argument;
+        ConvertBackslashToSlash(&s_outfile);
+      });
+  parser.AddOption(
+      'n', "module-name", "MODNAME",
+      "Unique name for the module being generated. This name is prefixed to\n"
+      "each of the generaed C symbols. By default, the module name from the\n"
+      "names section is used. If that is not present the name of the input\n"
+      "file is used as the default.\n",
+      [](const char* argument) { s_write_c_options.module_name = argument; });
   s_features.AddOptions(&parser);
   parser.AddOption("no-debug-names", "Ignore debug names in the binary file",
                    []() { s_read_debug_names = false; });
@@ -79,15 +101,15 @@ static void ParseOptions(int argc, char** argv) {
       });
   parser.Parse(argc, argv);
 
-  // TODO(binji): currently wasm2c doesn't support any non-default feature
-  // flags.
-  bool any_non_default_feature = false;
-#define WABT_FEATURE(variable, flag, default_, help) \
-  any_non_default_feature |= (s_features.variable##_enabled() != default_);
+  bool any_non_supported_feature = false;
+#define WABT_FEATURE(variable, flag, default_, help)   \
+  any_non_supported_feature |=                         \
+      (s_features.variable##_enabled() != default_) && \
+      !IsFeatureSupported(flag);
 #include "src/feature.def"
 #undef WABT_FEATURE
 
-  if (any_non_default_feature) {
+  if (any_non_supported_feature) {
     fprintf(stderr,
             "wasm2c currently only supports a fixed set of features.\n");
     exit(1);
@@ -96,9 +118,9 @@ static void ParseOptions(int argc, char** argv) {
 }
 
 // TODO(binji): copied from binary-writer-spec.cc, probably should share.
-static string_view strip_extension(string_view s) {
-  string_view ext = s.substr(s.find_last_of('.'));
-  string_view result = s;
+static std::string_view strip_extension(std::string_view s) {
+  std::string_view ext = s.substr(s.find_last_of('.'));
+  std::string_view result = s;
 
   if (ext == ".c")
     result.remove_suffix(ext.length());
@@ -138,17 +160,32 @@ int ProgramMain(int argc, char** argv) {
       }
 
       if (Succeeded(result)) {
-        std::string header_name_full =
-            strip_extension(s_outfile).to_string() + ".h";
-        std::string imports_name_full =
-            strip_extension(s_outfile).to_string() + ".imports.c";
-        FileStream c_stream(s_outfile.c_str());
-        FileStream h_stream(header_name_full);
-        FileStream imports_stream(imports_name_full);
-        string_view header_name = GetBasename(header_name_full);
-        result = WriteC(&c_stream, &h_stream, &imports_stream,
-                        header_name.to_string().c_str(), &module,
-                        s_write_c_options);
+        if (!s_outfile.empty()) {
+          std::string header_name_full =
+              std::string(strip_extension(s_outfile)) + ".h";
+          std::string imports_name_full =
+              std::string(strip_extension(s_outfile)) + ".imports.c";
+          FileStream c_stream(s_outfile.c_str());
+          FileStream h_stream(header_name_full);
+          FileStream imports_stream(imports_name_full);
+          std::string_view header_name = GetBasename(header_name_full);
+          if (s_write_c_options.module_name.empty()) {
+            s_write_c_options.module_name = module.name;
+            if (s_write_c_options.module_name.empty()) {
+              // In the absence of module name in the names section use the
+              // filename.
+              s_write_c_options.module_name =
+                  StripExtension(GetBasename(s_infile));
+            }
+          }
+          result = WriteC(&c_stream, &h_stream, &imports_stream,
+                          std::string(header_name).c_str(), &module,
+                          s_write_c_options);
+        } else {
+          FileStream stream(stdout);
+          result =
+              WriteC(&stream, &stream, "wasm.h", &module, s_write_c_options);
+        }
       }
     }
     FormatErrorsToFile(errors, Location::Type::Binary);
