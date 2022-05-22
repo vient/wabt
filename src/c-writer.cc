@@ -234,6 +234,7 @@ class CWriter {
   void WriteMemory(const std::string&);
   void WriteTables();
   void WriteTable(const std::string&);
+  void WriteCombinedDataInitializer();
   void WriteDataInitializers();
   void WriteElemInitializers();
   void WriteInitExports();
@@ -796,6 +797,7 @@ std::string CWriter::GenerateHeaderGuard() const {
 void CWriter::WriteSourceTop() {
   Write(s_source_includes);
   Write(Newline(), "#include \"", header_name_, "\"", Newline());
+  WriteCombinedDataInitializer();
   Write(s_source_declarations);
 }
 
@@ -916,8 +918,7 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Func: {
         const Func& func = cast<FuncImport>(import)->func;
         Write("void ");
-        Write(MangleName(import->module_name) + MangleFuncName(import->field_name, func.decl.sig.param_types,
-                               func.decl.sig.result_types));
+        Write(MangleName(import->module_name) + MangleName(import->field_name));
         Write("() {}");
         break;
       }
@@ -925,7 +926,8 @@ void CWriter::WriteImportsStubs() {
       case ExternalKind::Global: {
         const Global& global = cast<GlobalImport>(import)->global;
         Write("int ");
-        Write(MangleName(import->module_name) + MangleGlobalName(import->field_name, global.type));
+        WriteGlobal(global, DefineImportName(global.name, import->module_name,
+                                             MangleName(import->field_name)));
         Write(";  /* global */");
         break;
       }
@@ -1066,6 +1068,49 @@ void CWriter::WriteTables() {
 
 void CWriter::WriteTable(const std::string& name) {
   Write("wasm_rt_table_t ", name, ";");
+}
+
+void CWriter::WriteCombinedDataInitializer() {
+  assert(module_->memories.size() <= 1);
+  assert(module_->num_memory_imports == 0);
+
+  std::map<uint64_t, const DataSegment*> data_segments;
+  for (const DataSegment* data_segment : module_->data_segments) {
+    if (!data_segment->data.size()) {
+      continue;
+    }
+    const auto& offset_expr = data_segment->offset.front();
+    assert(offset_expr.type() == ExprType::Const);
+    auto const_ = cast<ConstExpr>(&offset_expr)->const_;
+    assert(const_.type() == Type::I32);
+    data_segments[const_.u32()] = data_segment;
+  }
+
+  Write(Newline(), "u8 data_segment_combined[] __attribute__((section(\".wasm_data\"))) = ", OpenBrace());
+  size_t i = 0;
+  for (const auto& [offset, data_segment] : data_segments) {
+    assert(i <= offset);
+    while (i < offset) {
+      Write("0x00, ");
+      if ((++i % 12) == 0) {
+        Write(Newline());
+      }
+    }
+    for (auto x : data_segment->data) {
+      Writef("0x%02x, ", x);
+      if ((++i % 12) == 0) {
+        Write(Newline());
+      }
+    }
+  }
+  auto hack = i + 65536;
+  while (i < hack || i % 4096 != 0) {
+    Write("0x00, ");
+    if ((++i % 12) == 0) {
+      Write(Newline());
+    }
+  }
+  Write(CloseBrace(), ";", Newline());
 }
 
 void CWriter::WriteDataInitializers() {
@@ -2459,8 +2504,10 @@ void CWriter::WriteCSource() {
 }
 
 void CWriter::WriteImportsSource() {
-  stream_ = imports_stream_;
-  WriteImportsStubs();
+  if (imports_stream_ != nullptr) {
+    stream_ = imports_stream_;
+    WriteImportsStubs();
+  }
 }
 
 Result CWriter::WriteModule(const Module& module) {

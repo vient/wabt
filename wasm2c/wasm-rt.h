@@ -180,7 +180,7 @@ void wasm_rt_free(void);
  *
  * This is typically called by the generated code, and not the embedder.
  */
-WASM_RT_NO_RETURN void wasm_rt_trap(wasm_rt_trap_t);
+void wasm_rt_trap(wasm_rt_trap_t);
 
 /**
  * Return a human readable error string based on a trap type.

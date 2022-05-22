@@ -50,10 +50,10 @@ static const char s_description[] =
 
 examples:
   # parse binary file test.wasm and write test.c and test.h
-  $ wasm2c test.wasm test.c
+  $ wasm2c test.wasm -o test.c
 
   # parse test.wasm, write test.c and test.h, but ignore the debug names, if any
-  $ wasm2c test.wasm --no-debug-names test.c
+  $ wasm2c test.wasm --no-debug-names -o test.c
 )";
 
 static const std::string supported_features[] = {
@@ -93,12 +93,6 @@ static void ParseOptions(int argc, char** argv) {
                        s_infile = argument;
                        ConvertBackslashToSlash(&s_infile);
                      });
-  parser.AddArgument(
-      "output", OptionParser::ArgumentCount::One,
-      [](const char* argument) {
-        s_outfile = argument;
-        ConvertBackslashToSlash(&s_outfile);
-      });
   parser.Parse(argc, argv);
 
   bool any_non_supported_feature = false;
@@ -184,7 +178,7 @@ int ProgramMain(int argc, char** argv) {
         } else {
           FileStream stream(stdout);
           result =
-              WriteC(&stream, &stream, "wasm.h", &module, s_write_c_options);
+              WriteC(&stream, &stream, nullptr, "wasm.h", &module, s_write_c_options);
         }
       }
     }
